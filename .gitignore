@@ -1,0 +1,15 @@
+# Ignore standard OS files
+.DS_Store
+Thumbs.db
+
+# Ignore IDE/Editor files
+.vscode/
+.idea/
+
+# Ignore configuration exports and command scripts
+*.xml
+*.txt
+
+# Allow the README, License, and source code
+!README.md
+!LICENSE
