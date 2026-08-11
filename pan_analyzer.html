@@ -1,0 +1,1557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PAN-OS Unused Object Analyzer</title>
+<style>
+/* ============================================================
+   RESET & CSS VARIABLES
+   ============================================================ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:           #0d1117;
+  --surface:      #161b22;
+  --surface2:     #21262d;
+  --surface3:     #2d333b;
+  --border:       #30363d;
+  --border2:      #444c56;
+  --text:         #c9d1d9;
+  --text-muted:   #8b949e;
+  --text-subtle:  #6e7681;
+  --accent:       #58a6ff;
+  --accent-dim:   #1f6feb;
+  --accent-hover: #79b8ff;
+  --success:      #3fb950;
+  --success-bg:   #0f2d17;
+  --warning:      #d29922;
+  --warning-bg:   #2d1f00;
+  --danger:       #f85149;
+  --danger-bg:    #2d0c0c;
+  --addr-color:   #58a6ff;
+  --addrg-color:  #bc8cff;
+  --svc-color:    #79c0ff;
+  --svcg-color:   #d2a8ff;
+  --radius:       6px;
+  --radius-lg:    12px;
+}
+
+[data-theme="light"] {
+  --bg:           #ffffff;
+  --surface:      #f6f8fa;
+  --surface2:     #ebedf0;
+  --surface3:     #d0d7de;
+  --border:       #d0d7de;
+  --border2:      #afb8c1;
+  --text:         #1F2328;
+  --text-muted:   #656d76;
+  --text-subtle:  #7d8590;
+  --accent:       #0969da;
+  --accent-dim:   #0550ae;
+  --accent-hover: #0860CA;
+  --success:      #1a7f37;
+  --success-bg:   #dafbe1;
+  --warning:      #9a6700;
+  --warning-bg:   #fff8c5;
+  --danger:       #cf222e;
+  --danger-bg:    #ffebe9;
+  --addr-color:   #0550ae;
+  --addrg-color:  #8250df;
+  --svc-color:    #0550ae;
+  --svcg-color:   #8250df;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  font-size: 14px;
+  line-height: 1.5;
+  transition: background 0.2s, color 0.2s;
+}
+
+.app-header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 24px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.app-logo {
+  width: 28px; height: 28px;
+  background: linear-gradient(135deg, #1f6feb 0%, #388bfd 100%);
+  border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 13px; color: white; flex-shrink: 0;
+}
+.app-title   { font-size: 15px; font-weight: 600; color: var(--text); }
+.app-subtitle{ font-size: 12px; color: var(--text-muted); margin-left: 4px; }
+.header-spacer { flex: 1; }
+.header-badge {
+  font-size: 11px; padding: 2px 8px; border-radius: 12px;
+  background: var(--surface2); border: 1px solid var(--border); color: var(--text-muted);
+}
+.theme-toggle {
+  background: none; border: 1px solid var(--border); border-radius: var(--radius);
+  color: var(--text-muted); cursor: pointer; font-size: 18px; padding: 4px 8px;
+  line-height: 1; display: flex; align-items: center; justify-content: center;
+  transition: background 0.2s;
+}
+.theme-toggle:hover { background: var(--surface2); }
+
+.main { max-width: 1280px; margin: 0 auto; padding: 32px 24px 80px; }
+
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); overflow: hidden;
+}
+.card-header {
+  padding: 16px 20px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 10px;
+}
+.card-header h2 { font-size: 14px; font-weight: 600; color: var(--text); }
+.card-header .step-badge {
+  width: 22px; height: 22px; border-radius: 50%; background: var(--accent-dim);
+  color: white; font-size: 11px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.card-body { padding: 20px; }
+
+.input-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 768px) { .input-grid { grid-template-columns: 1fr; } }
+
+.input-panel {
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--radius); overflow: hidden;
+  display: flex; flex-direction: column; transition: border-color 0.2s;
+}
+.input-panel.active { border-color: var(--accent-dim); }
+.input-panel-header {
+  padding: 10px 14px; border-bottom: 1px solid var(--border);
+  font-size: 12px; font-weight: 600; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.5px;
+  display: flex; align-items: center; gap: 6px;
+}
+
+.drop-zone {
+  padding: 32px 20px; text-align: center; cursor: pointer; flex: 1;
+  transition: background 0.2s; min-height: 160px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+}
+.drop-zone:hover, .drop-zone.dragging { background: rgba(88,166,255,0.06); }
+.drop-zone-icon {
+  width: 40px; height: 40px; background: var(--surface3); border-radius: 8px;
+  display: flex; align-items: center; justify-content: center; font-size: 20px;
+}
+.drop-zone-text  { font-size: 13px; color: var(--text); }
+.drop-zone-hint  { font-size: 12px; color: var(--text-muted); }
+.drop-zone-link  { color: var(--accent); text-decoration: underline; cursor: pointer; }
+.file-chosen {
+  display: flex; align-items: center; gap: 8px; padding: 8px 12px;
+  background: var(--success-bg); border-top: 1px solid var(--border);
+  font-size: 12px; color: var(--success);
+}
+
+.paste-textarea {
+  width: 100%; min-height: 160px; background: transparent; border: none;
+  color: var(--text); font-family: 'SFMono-Regular','Consolas','Liberation Mono',monospace;
+  font-size: 12px; line-height: 1.5; padding: 14px; resize: vertical; outline: none;
+}
+.paste-textarea::placeholder { color: var(--text-subtle); }
+
+.format-badge {
+  display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px;
+  border-radius: 12px; font-size: 12px; font-weight: 500; border: 1px solid;
+}
+.format-badge.xml          { background: rgba(63,185,80,0.1);  border-color: rgba(63,185,80,0.4);  color: var(--success); }
+.format-badge.set-commands { background: rgba(210,153,34,0.1); border-color: rgba(210,153,34,0.4); color: var(--warning); }
+.format-badge.unknown      { background: var(--surface2); border-color: var(--border); color: var(--text-muted); }
+
+.analyze-bar { display: flex; align-items: center; gap: 16px; margin-top: 20px; flex-wrap: wrap; }
+
+.btn {
+  display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px;
+  border-radius: var(--radius); font-size: 13px; font-weight: 500;
+  border: 1px solid transparent; cursor: pointer; transition: all 0.15s;
+  font-family: inherit; text-decoration: none;
+}
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-primary  { background: #238636; border-color: rgba(240,246,252,0.1); color: white; }
+.btn-primary:not(:disabled):hover  { background: #2ea043; }
+.btn-accent   { background: var(--accent-dim); border-color: rgba(240,246,252,0.1); color: white; }
+.btn-accent:not(:disabled):hover   { background: #388bfd; }
+.btn-secondary{ background: var(--surface2); border-color: var(--border2); color: var(--text); }
+.btn-secondary:not(:disabled):hover{ background: var(--surface3); }
+.btn-lg { padding: 10px 24px; font-size: 14px; }
+
+#progress-section { margin-top: 20px; display: none; }
+.progress-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 16px 20px;
+}
+.progress-label {
+  font-size: 13px; color: var(--text-muted); margin-bottom: 8px;
+  display: flex; justify-content: space-between;
+}
+.progress-bar-track {
+  width: 100%; height: 6px; background: var(--surface3);
+  border-radius: 3px; overflow: hidden;
+}
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-dim), var(--accent));
+  border-radius: 3px; transition: width 0.3s ease; width: 0%;
+}
+
+.stats-grid {
+  display: grid; grid-template-columns: repeat(auto-fit,minmax(160px,1fr));
+  gap: 12px; margin-bottom: 20px;
+}
+.stat-card {
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 14px 16px;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.stat-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+.stat-value { font-size: 28px; font-weight: 700; line-height: 1; }
+.stat-sub   { font-size: 11px; color: var(--text-muted); }
+.stat-card.addr  .stat-value { color: var(--addr-color); }
+.stat-card.addrg .stat-value { color: var(--addrg-color); }
+.stat-card.svc   .stat-value { color: var(--svc-color); }
+.stat-card.svcg  .stat-value { color: var(--svcg-color); }
+.stat-card.total .stat-value { color: var(--text); }
+
+.filter-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+.filter-input {
+  background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius);
+  color: var(--text); font-family: inherit; font-size: 13px; padding: 6px 12px;
+  outline: none; transition: border-color 0.15s; min-width: 180px;
+}
+.filter-input:focus  { border-color: var(--accent-dim); }
+.filter-input::placeholder { color: var(--text-subtle); }
+.filter-select {
+  background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius);
+  color: var(--text); font-family: inherit; font-size: 13px; padding: 6px 10px;
+  outline: none; cursor: pointer; transition: border-color 0.15s;
+}
+.filter-select:focus  { border-color: var(--accent-dim); }
+.filter-select option { background: var(--surface2); }
+.filter-spacer { flex: 1; }
+.filter-count  { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+
+.table-wrapper { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+thead { background: var(--surface2); position: sticky; top: 56px; z-index: 10; }
+thead th {
+  padding: 9px 12px; text-align: left; font-weight: 600; color: var(--text-muted);
+  font-size: 12px; border-bottom: 1px solid var(--border); white-space: nowrap;
+  user-select: none; cursor: pointer;
+}
+thead th:hover     { color: var(--text); }
+thead th.no-sort   { cursor: default; }
+thead th.sort-asc::after  { content: ' ▴'; color: var(--accent); }
+thead th.sort-desc::after { content: ' ▾'; color: var(--accent); }
+tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
+tbody tr:last-child { border-bottom: none; }
+tbody tr:hover  { background: var(--surface2); }
+tbody tr.hidden { display: none; }
+tbody td { padding: 8px 12px; vertical-align: middle; }
+
+.type-badge {
+  display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px;
+  border-radius: 12px; font-size: 11px; font-weight: 500; white-space: nowrap;
+}
+.type-badge.address       { background: rgba(88,166,255,0.15);  color: var(--addr-color); }
+.type-badge.address-group { background: rgba(188,140,255,0.15); color: var(--addrg-color); }
+.type-badge.service       { background: rgba(121,192,255,0.15); color: var(--svc-color); }
+.type-badge.service-group { background: rgba(210,168,255,0.15); color: var(--svcg-color); }
+
+.dg-chip {
+  font-family: 'SFMono-Regular','Consolas',monospace; font-size: 11px;
+  color: var(--text-muted); background: var(--surface3); padding: 1px 6px;
+  border-radius: 4px; white-space: nowrap;
+}
+.obj-name {
+  font-family: 'SFMono-Regular','Consolas',monospace; font-size: 12px;
+  color: var(--text); font-weight: 500;
+}
+.obj-details {
+  font-size: 12px; color: var(--text-muted); max-width: 240px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cmd-cell { display: flex; align-items: center; gap: 6px; }
+.cmd-text {
+  font-family: 'SFMono-Regular','Consolas',monospace; font-size: 11px;
+  color: var(--text-muted); background: var(--surface3); padding: 2px 6px;
+  border-radius: 4px; white-space: nowrap; overflow: hidden;
+  text-overflow: ellipsis; max-width: 300px; cursor: text; user-select: all;
+}
+.copy-btn {
+  background: none; border: none; cursor: pointer; color: var(--text-subtle);
+  padding: 2px 4px; border-radius: 3px; font-size: 12px; flex-shrink: 0;
+  transition: color 0.15s;
+}
+.copy-btn:hover { color: var(--accent); }
+.cb-cell { width: 40px; text-align: center; }
+input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--accent-dim); cursor: pointer; }
+
+.export-bar {
+  display: flex; align-items: center; gap: 12px; margin-top: 16px;
+  padding: 14px 16px; background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--radius); flex-wrap: wrap;
+}
+.export-bar-left { display: flex; align-items: center; gap: 10px; flex: 1; }
+.selected-count  { font-size: 13px; font-weight: 600; color: var(--text); }
+.selected-count span { color: var(--accent); }
+
+.empty-state  { text-align: center; padding: 60px 20px; }
+.empty-icon   { font-size: 48px; margin-bottom: 12px; }
+.empty-title  { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+.empty-desc   { font-size: 13px; color: var(--text-muted); max-width: 360px; margin: 0 auto; }
+
+.error-banner {
+  display: flex; align-items: flex-start; gap: 10px; padding: 12px 16px;
+  background: var(--danger-bg); border: 1px solid rgba(248,81,73,0.4);
+  border-radius: var(--radius); color: var(--danger); font-size: 13px; margin-top: 12px;
+}
+
+.hidden { display: none !important; }
+.mt-16  { margin-top: 16px; }
+.mt-20  { margin-top: 20px; }
+.mt-24  { margin-top: 24px; }
+
+/* ignore-disabled uses CSS rule so .hidden !important can override it cleanly */
+#ignore-disabled-wrap { display: flex; align-items: center; gap: 6px; margin-left: 8px; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinner {
+  width: 16px; height: 16px; border: 2px solid var(--surface3);
+  border-top-color: var(--accent); border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+::-webkit-scrollbar        { width: 6px; height: 6px; }
+::-webkit-scrollbar-track  { background: var(--surface); }
+::-webkit-scrollbar-thumb  { background: var(--surface3); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border2); }
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="app-logo">PA</div>
+  <span class="app-title">PAN-OS Unused Object Analyzer</span>
+  <span class="app-subtitle">Panorama &amp; NGFW</span>
+  <div class="header-spacer"></div>
+  <button class="theme-toggle" id="theme-toggle" title="Toggle light/dark theme" aria-label="Theme toggle">🌙</button>
+  <span class="header-badge" id="format-indicator">No input</span>
+</header>
+
+<main class="main">
+
+  <div class="card" id="input-card">
+    <div class="card-header">
+      <div class="step-badge">1</div>
+      <h2>Load Configuration</h2>
+    </div>
+    <div class="card-body">
+      <div class="input-grid">
+
+        <div class="input-panel" id="file-panel">
+          <div class="input-panel-header">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M2 1.75C2 .784 2.784 0 3.75 0h6.586c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v9.586A1.75 1.75 0 0 1 13.25 16h-9.5A1.75 1.75 0 0 1 2 14.25Zm1.75-.25a.25.25 0 0 0-.25.25v12.5c0 .138.112.25.25.25h9.5a.25.25 0 0 0 .25-.25V6h-2.75A1.75 1.75 0 0 1 8.75 4.25V1.5Zm6.75.062V4.25c0 .138.112.25.25.25h2.688l-.011-.013-2.914-2.914z"/></svg>
+            Upload XML Config File
+          </div>
+          <div class="drop-zone" id="drop-zone">
+            <div class="drop-zone-icon">📄</div>
+            <div class="drop-zone-text">
+              Drop your Panorama <strong>.xml</strong> config here<br>
+              <span class="drop-zone-hint">or <span class="drop-zone-link" id="browse-link">browse to select file</span></span>
+            </div>
+            <div class="drop-zone-hint" style="font-size:11px;color:var(--text-subtle)">
+              Export from: Setup → Operations → Export Panorama configuration version
+            </div>
+          </div>
+          <div id="file-chosen" style="display:none" class="file-chosen">
+            <span>✓</span>
+            <span id="file-name-display">—</span>
+            <span id="file-size-display" style="color:var(--text-subtle)"></span>
+            <button class="btn btn-secondary" style="padding:1px 7px;font-size:11px;margin-left:auto" id="clear-file-btn">×</button>
+          </div>
+          <input type="file" id="file-input" accept=".xml,text/xml,application/xml" style="display:none">
+        </div>
+
+        <div class="input-panel" id="paste-panel">
+          <div class="input-panel-header">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M3.626 3.533a.249.249 0 0 0-.126.217v9.5c0 .138.112.25.25.25h8.5a.25.25 0 0 0 .25-.25v-9.5a.249.249 0 0 0-.126-.217 1.75 1.75 0 0 0-.874-.283H11a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1h-.374a1.75 1.75 0 0 0-.874.283z"/></svg>
+            Paste Set Commands
+          </div>
+          <textarea class="paste-textarea" id="paste-input"
+            placeholder="Paste PAN-OS set commands here...
+
+Example (Panorama):
+  set shared address HOST-1 ip-netmask 192.168.1.1/32
+  set device-group DG1 pre-rulebase security rules RULE-1 source HOST-1
+
+Example (NGFW):
+  set address HOST-1 ip-netmask 192.168.1.1/32
+  set rulebase security rules RULE-1 source [ HOST-1 HOST-2 ]"></textarea>
+        </div>
+      </div>
+
+      <div class="analyze-bar">
+        <button class="btn btn-primary btn-lg" id="analyze-btn" disabled>
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M10.5 2.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-.5.5H11v1.5a.5.5 0 0 1-1 0V5h-.5a.5.5 0 0 1 0-1H10V2.5zm-4 0a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-.5.5H7v1.5a.5.5 0 0 1-1 0V5h-.5a.5.5 0 0 1 0-1H6V2.5zM1 8a7 7 0 1 1 14 0A7 7 0 0 1 1 8zm7-5.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11z"/></svg>
+          Analyze
+        </button>
+        <div id="format-badge-wrap"></div>
+        <!-- Only shown for XML — set commands don't expose the disabled flag -->
+        <div id="ignore-disabled-wrap" class="hidden">
+          <input type="checkbox" id="ignore-disabled-cb">
+          <label for="ignore-disabled-cb" style="font-size:13px;color:var(--text);cursor:pointer">Ignore disabled rules</label>
+        </div>
+        <div id="error-banner" class="error-banner hidden">
+          <span>⚠</span><span id="error-text"></span>
+        </div>
+      </div>
+
+      <div id="progress-section">
+        <div class="progress-card">
+          <div class="progress-label">
+            <span id="progress-text">Parsing configuration...</span>
+            <span id="progress-pct">0%</span>
+          </div>
+          <div class="progress-bar-track">
+            <div class="progress-bar-fill" id="progress-fill"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mt-24 hidden" id="results-card">
+    <div class="card-header">
+      <div class="step-badge">2</div>
+      <h2>Analysis Results</h2>
+      <div id="results-header-info" style="margin-left:auto;font-size:12px;color:var(--text-muted)"></div>
+    </div>
+    <div class="card-body">
+      <div class="stats-grid" id="stats-grid"></div>
+
+      <div id="empty-results" class="empty-state hidden">
+        <div class="empty-icon">🎉</div>
+        <div class="empty-title">No unused objects found!</div>
+        <div class="empty-desc">All address and service objects are referenced by at least one policy or group.</div>
+      </div>
+
+      <div id="table-section">
+        <div class="filter-bar">
+          <input type="text" class="filter-input" id="search-input" placeholder="🔍 Search by name...">
+          <select class="filter-select" id="type-filter">
+            <option value="">All types</option>
+            <option value="address">Address</option>
+            <option value="address-group">Address Group</option>
+            <option value="service">Service</option>
+            <option value="service-group">Service Group</option>
+          </select>
+          <select class="filter-select" id="dg-filter">
+            <option value="">All device groups</option>
+          </select>
+          <div class="filter-spacer"></div>
+          <span class="filter-count" id="filter-count"></span>
+        </div>
+
+        <div class="table-wrapper">
+          <table id="results-table">
+            <thead>
+              <tr>
+                <th class="cb-cell no-sort"><input type="checkbox" id="select-all-cb" title="Select / deselect all visible"></th>
+                <th data-col="type">Type</th>
+                <th data-col="dg">Device Group</th>
+                <th data-col="name">Name</th>
+                <th data-col="details">Details</th>
+                <th class="no-sort">Delete Command</th>
+              </tr>
+            </thead>
+            <tbody id="results-tbody"></tbody>
+          </table>
+        </div>
+
+        <div class="export-bar mt-16">
+          <div class="export-bar-left">
+            <button class="btn btn-secondary" id="select-all-btn"   style="padding:5px 10px;font-size:12px">Select all</button>
+            <button class="btn btn-secondary" id="deselect-all-btn" style="padding:5px 10px;font-size:12px">Deselect all</button>
+            <span class="selected-count"><span id="selected-num">0</span> selected</span>
+          </div>
+          <button class="btn btn-accent btn-lg" id="download-btn" disabled>
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14Z"/><path d="M7.25 7.689V2a.75.75 0 0 1 1.5 0v5.689l1.97-1.969a.749.749 0 1 1 1.06 1.06l-3.25 3.25a.749.749 0 0 1-1.06 0L4.22 6.78a.749.749 0 1 1 1.06-1.06l1.97 1.969Z"/></svg>
+            Download Delete Commands (.txt)
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+'use strict';
+
+/* ============================================================
+   THEME
+   ============================================================ */
+(function() {
+  const saved = localStorage.getItem('pan-analyzer-theme') || 'dark';
+  document.documentElement.setAttribute('data-theme', saved);
+  const btn = document.getElementById('theme-toggle');
+  btn.textContent = saved === 'light' ? '☀️' : '🌙';
+  btn.addEventListener('click', () => {
+    const cur  = document.documentElement.getAttribute('data-theme');
+    const next = cur === 'light' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', next);
+    btn.textContent = next === 'light' ? '☀️' : '🌙';
+    localStorage.setItem('pan-analyzer-theme', next);
+  });
+})();
+
+/* ============================================================
+   MAIN-THREAD CONSTANTS
+   (BUILTIN_NAMES is also duplicated inside WORKER_SRC — keep in sync)
+   ============================================================ */
+
+const BUILTIN_NAMES = new Set([
+  'any','any-ipv4','any-ipv6','none',
+  'application-default','service-http','service-https',
+  'trust','untrust','dmz','tap','loopback',
+  'tunnel','ha','vlan','panorama','multicast',
+]);
+
+/* ============================================================
+   MAIN-THREAD UTILITIES
+   (used by the set-commands parser which must stay on the main
+   thread to allow async yielding between chunks)
+   ============================================================ */
+
+function truncList(items) {
+  if (!items.length) return 'empty';
+  return items.length > 4
+    ? items.slice(0, 4).join(', ') + ' +' + (items.length - 4) + ' more'
+    : items.join(', ');
+}
+
+function yieldToUI() { return new Promise(r => setTimeout(r, 0)); }
+
+function detectFormat(text) {
+  const t = (text || '').trim();
+  if (!t) return 'empty';
+  if (t.startsWith('<') || /^<[?!]?(?:config|response|panorama)[\s>]/i.test(t)) return 'xml';
+  if (/^\s*set\s+/m.test(t)) return 'set-commands';
+  return 'unknown';
+}
+
+/* ============================================================
+   WEB WORKER  (all XML parsing lives here)
+
+   Architecture:
+     analyze-xml   → DOMParser + buildXMLCache + analyzeCache
+     analyze-cache → analyzeCache only  (set-commands path)
+
+   Why XML parsing is here:
+     DOMParser.parseFromString() is synchronous. For large configs
+     (50–200 MB) this previously froze the browser tab for 10–40
+     seconds before the progress bar could even start. Moving it
+     into the worker keeps the UI fully responsive throughout.
+
+   XPathResult constants: the XPathResult global is not available
+   in Workers, so numeric values are used directly.
+     7 = ORDERED_NODE_SNAPSHOT_TYPE
+     2 = STRING_TYPE
+
+   Template literals are avoided inside WORKER_SRC because the
+   outer backtick string would interpret ${...} expressions.
+   String concatenation is used throughout instead.
+
+   BUILTIN_NAMES is duplicated here from the main thread.
+   ============================================================ */
+
+const WORKER_SRC = `
+'use strict';
+
+/* XPathResult constants — named global unavailable in Workers */
+var XPATH_SNAPSHOT = 7; /* ORDERED_NODE_SNAPSHOT_TYPE */
+var XPATH_STRING   = 2; /* STRING_TYPE                */
+
+var BUILTIN_NAMES = new Set([
+  'any','any-ipv4','any-ipv6','none',
+  'application-default','service-http','service-https',
+  'trust','untrust','dmz','tap','loopback',
+  'tunnel','ha','vlan','panorama','multicast',
+]);
+
+var POLICY_PATHS = [
+  { path: 'pre-rulebase/security/rules/entry',              isNat: false },
+  { path: 'post-rulebase/security/rules/entry',             isNat: false },
+  { path: 'pre-rulebase/nat/rules/entry',                   isNat: true  },
+  { path: 'post-rulebase/nat/rules/entry',                  isNat: true  },
+  { path: 'pre-rulebase/pbf/rules/entry',                   isNat: false },
+  { path: 'post-rulebase/pbf/rules/entry',                  isNat: false },
+  { path: 'pre-rulebase/qos/rules/entry',                   isNat: false },
+  { path: 'post-rulebase/qos/rules/entry',                  isNat: false },
+  { path: 'pre-rulebase/decryption/rules/entry',            isNat: false },
+  { path: 'post-rulebase/decryption/rules/entry',           isNat: false },
+  { path: 'pre-rulebase/tunnel-inspect/rules/entry',        isNat: false },
+  { path: 'post-rulebase/tunnel-inspect/rules/entry',       isNat: false },
+  { path: 'pre-rulebase/application-override/rules/entry',  isNat: false },
+  { path: 'post-rulebase/application-override/rules/entry', isNat: false },
+  { path: 'pre-rulebase/dos/rules/entry',                   isNat: false },
+  { path: 'post-rulebase/dos/rules/entry',                  isNat: false },
+  { path: 'rulebase/security/rules/entry',                  isNat: false },
+  { path: 'rulebase/nat/rules/entry',                       isNat: true  },
+];
+
+/* ---- XPath helpers ---- */
+
+function xpathNodes(expr, ctx, doc) {
+  doc = doc || ctx.ownerDocument || ctx;
+  try {
+    var r = doc.evaluate(expr, ctx, null, XPATH_SNAPSHOT, null);
+    var out = [];
+    for (var i = 0; i < r.snapshotLength; i++) out.push(r.snapshotItem(i));
+    return out;
+  } catch(e) { return []; }
+}
+
+function xpathText(expr, ctx, doc) {
+  doc = doc || ctx.ownerDocument || ctx;
+  try { return doc.evaluate(expr, ctx, null, XPATH_STRING, null).stringValue || null; }
+  catch(e) { return null; }
+}
+
+/* Safely quote a value for use inside an XPath predicate */
+function xpathStr(v) {
+  if (v.indexOf("'") < 0) return "'" + v + "'";
+  if (v.indexOf('"') < 0) return '"' + v + '"';
+  return 'concat(' + v.split("'").map(function(p){ return "'" + p + "'"; }).join(',"' + "'" + '"') + ')';
+}
+
+/* ---- Config helpers ---- */
+
+function getConfigElement(doc) {
+  var root = doc.documentElement;
+  if (root.tagName === 'config') return root;
+  var n = doc.querySelector('result > config') || doc.querySelector('config');
+  if (n) return n;
+  throw new Error('Could not find <config> element. Please provide a valid Panorama or NGFW configuration XML export.');
+}
+
+function parseDGHierarchy(configEl, doc) {
+  var children = {}, parents = {};
+  var readonlyPath = "readonly/devices/entry[@name='localhost.localdomain']/device-group/entry";
+  var readonlyDGs  = xpathNodes(readonlyPath, configEl, doc);
+  var allDGNames   = readonlyDGs.map(function(e){ return e.getAttribute('name'); });
+
+  for (var i = 0; i < readonlyDGs.length; i++) {
+    var e    = readonlyDGs[i];
+    var name = e.getAttribute('name');
+    var pEl  = xpathNodes('parent-dg', e, doc)[0];
+    if (pEl) {
+      var p = pEl.textContent.trim();
+      if (!children[p]) children[p] = [];
+      children[p].push(name);
+      parents[name] = p;
+    }
+  }
+
+  /* Secondary: catch NGFW / minimal exports without a readonly section */
+  var secondary = xpathNodes('devices/entry/device-group/entry', configEl, doc);
+  for (var j = 0; j < secondary.length; j++) {
+    var sname = secondary[j].getAttribute('name');
+    if (sname && allDGNames.indexOf(sname) < 0) allDGNames.push(sname);
+  }
+
+  /* DGs without a known parent → direct children of shared */
+  for (var k = 0; k < allDGNames.length; k++) {
+    var dg = allDGNames[k];
+    if (!parents[dg]) {
+      if (!children['shared']) children['shared'] = [];
+      children['shared'].push(dg);
+      parents[dg] = 'shared';
+    }
+  }
+
+  return { allDGs: allDGNames, children: children, parents: parents };
+}
+
+function dgPrefix(dg) {
+  return dg === 'shared'
+    ? 'shared/'
+    : 'devices/entry/device-group/entry[' + xpathStr(dg) + ']/';
+}
+
+function extractAddressDetails(e, doc) {
+  var ip  = xpathText('ip-netmask', e, doc); if (ip)  return ip;
+  var rng = xpathText('ip-range',   e, doc); if (rng) return rng + ' (range)';
+  var fqd = xpathText('fqdn',       e, doc); if (fqd) return fqd + ' (fqdn)';
+  return '-';
+}
+
+/* Handles TCP, UDP, SCTP and any future protocol tags via protocol/* */
+function extractServiceDetails(e, doc) {
+  var protos = xpathNodes('protocol/*', e, doc);
+  var parts  = [];
+  for (var i = 0; i < protos.length; i++) {
+    var tag  = protos[i].tagName;
+    var port = xpathText('port', protos[i], doc);
+    if (port) parts.push(tag.toUpperCase() + '/' + port);
+  }
+  return parts.length ? parts.join(', ') : '-';
+}
+
+function truncList(items) {
+  if (!items.length) return 'empty';
+  return items.length > 4
+    ? items.slice(0, 4).join(', ') + ' +' + (items.length - 4) + ' more'
+    : items.join(', ');
+}
+
+/* ---- XML cache builder (synchronous — runs in worker, no UI to block) ---- */
+
+function buildXMLCache(doc) {
+  self.postMessage({ type: 'progress', pct: 5, label: 'Scanning device groups...' });
+
+  var configEl     = getConfigElement(doc);
+  var hierarchy    = parseDGHierarchy(configEl, doc);
+  var deviceGroups = ['shared'].concat(hierarchy.allDGs);
+  var objects      = {};
+  var policies     = {};
+  var total        = deviceGroups.length;
+
+  for (var i = 0; i < total; i++) {
+    var dg  = deviceGroups[i];
+    var pfx = dgPrefix(dg);
+    var pct = 5 + Math.round((i / total) * 38);
+    self.postMessage({ type: 'progress', pct: pct,
+      label: 'Extracting ' + (i + 1) + '/' + total + ': ' + dg });
+
+    /* Addresses */
+    var addresses = xpathNodes(pfx + 'address/entry', configEl, doc)
+      .map(function(e){ return { name: e.getAttribute('name'), details: extractAddressDetails(e, doc) }; });
+
+    /* Address groups */
+    var addressGroups = xpathNodes(pfx + 'address-group/entry', configEl, doc).map(function(e) {
+      var name      = e.getAttribute('name');
+      var isDynamic = xpathNodes('dynamic', e, doc).length > 0;
+      var members   = isDynamic ? []
+        : xpathNodes('static/member', e, doc).map(function(m){ return m.textContent.trim(); });
+      return { name: name, members: members, isDynamic: isDynamic,
+               details: isDynamic ? '(dynamic filter)' : truncList(members) };
+    });
+
+    /* Services */
+    var services = xpathNodes(pfx + 'service/entry', configEl, doc)
+      .map(function(e){ return { name: e.getAttribute('name'), details: extractServiceDetails(e, doc) }; });
+
+    /* Service groups */
+    var serviceGroups = xpathNodes(pfx + 'service-group/entry', configEl, doc).map(function(e) {
+      var name    = e.getAttribute('name');
+      var members = xpathNodes('members/member', e, doc).map(function(m){ return m.textContent.trim(); });
+      return { name: name, members: members, details: truncList(members) };
+    });
+
+    objects[dg] = { addresses: addresses, addressGroups: addressGroups,
+                    services: services, serviceGroups: serviceGroups };
+
+    /* Policies */
+    var polList = [];
+    for (var pi = 0; pi < POLICY_PATHS.length; pi++) {
+      var path  = POLICY_PATHS[pi].path;
+      var isNat = POLICY_PATHS[pi].isNat;
+      var rules = xpathNodes(pfx + path, configEl, doc);
+
+      for (var ri = 0; ri < rules.length; ri++) {
+        var rule     = rules[ri];
+        var disabled = xpathText('disabled', rule, doc) === 'yes';
+        var sources      = xpathNodes('source/member',      rule, doc).map(function(m){ return m.textContent.trim(); });
+        var destinations = xpathNodes('destination/member', rule, doc).map(function(m){ return m.textContent.trim(); });
+
+        /* Skip stub rules */
+        if (sources.indexOf('none') >= 0 || destinations.indexOf('none') >= 0) continue;
+
+        var svcList;
+        if (isNat) {
+          var svcEl = xpathNodes('service', rule, doc)[0];
+          svcList = (svcEl && svcEl.textContent.trim()) ? [svcEl.textContent.trim()] : [];
+        } else {
+          var svcSet = {};
+          xpathNodes('service/member', rule, doc).forEach(function(m){ svcSet[m.textContent.trim()] = 1; });
+          xpathNodes('service/*',      rule, doc).forEach(function(m){ svcSet[m.textContent.trim()] = 1; });
+          svcList = Object.keys(svcSet);
+        }
+
+        var translatedAddrs = [];
+        if (isNat) {
+          var taPaths = [
+            'source-translation/translated-address',
+            'source-translation/dynamic-ip-and-port/translated-address/member',
+            'source-translation/static-ip/translated-address',
+            'destination-translation/translated-address',
+            'destination-translation/dynamic-ip-and-port/translated-address/member',
+            'destination-translation/static-ip/translated-address',
+          ];
+          for (var ti = 0; ti < taPaths.length; ti++) {
+            xpathNodes(taPaths[ti], rule, doc).forEach(function(m){ translatedAddrs.push(m.textContent.trim()); });
+          }
+        }
+
+        polList.push({ isNat: isNat, disabled: disabled, sources: sources,
+                       destinations: destinations, services: svcList,
+                       translatedAddrs: translatedAddrs });
+      }
+    }
+    policies[dg] = polList;
+  }
+
+  return { deviceGroups: deviceGroups, hierarchy: hierarchy,
+           objects: objects, policies: policies };
+}
+
+/* ---- Analysis helpers ---- */
+
+/**
+ * getAllChildDGs — BFS with seen-Set to guard against circular hierarchies.
+ */
+function getAllChildDGs(dg, children) {
+  var out = [dg], q = [dg], seen = {};
+  seen[dg] = true;
+  while (q.length) {
+    var cur  = q.shift();
+    var kids = children[cur] || [];
+    for (var i = 0; i < kids.length; i++) {
+      if (!seen[kids[i]]) {
+        seen[kids[i]] = true;
+        out.push(kids[i]);
+        q.push(kids[i]);
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * expandRefs — BFS with O(1) array-head dequeue.
+ * Only expands groups reachable from direct policy references.
+ * groupPool values are Sets (O(1) lookup during merge).
+ */
+function expandRefs(directRefs, groupPool) {
+  var inUse = new Set();
+  var queue = Array.from(directRefs);
+  var head  = 0;
+  while (head < queue.length) {
+    var name = queue[head++];
+    if (inUse.has(name)) continue;
+    inUse.add(name);
+    var members = groupPool[name];
+    if (members) {
+      members.forEach(function(m) {
+        if (!inUse.has(m)) queue.push(m);
+      });
+    }
+  }
+  return inUse;
+}
+
+function buildDeleteCmd(dg, category, name) {
+  var loc = dg === 'shared' ? 'shared' : ('device-group ' + dg);
+  return 'delete ' + loc + ' ' + category + ' ' + name;
+}
+
+/**
+ * analyzeCache — core detection logic.
+ * onProgress(pct 0-100) is optional; called periodically.
+ */
+function analyzeCache(cache, options, onProgress) {
+  var deviceGroups    = cache.deviceGroups;
+  var hierarchy       = cache.hierarchy;
+  var objects         = cache.objects;
+  var policies        = cache.policies;
+  var children        = hierarchy.children;
+  var results         = [];
+  var total           = deviceGroups.length;
+  var ignoreDisabled  = options && options.ignoreDisabled === true;
+
+  for (var i = 0; i < total; i++) {
+    var dg = deviceGroups[i];
+
+    var childDGs = getAllChildDGs(dg, children);
+    if (childDGs.indexOf('shared') < 0) childDGs.push('shared');
+
+    /* Build group pools with O(n) Set-based deduplication */
+    var addrGroupPool = {};
+    var svcGroupPool  = {};
+    for (var ci = 0; ci < childDGs.length; ci++) {
+      var o = objects[childDGs[ci]];
+      if (!o) continue;
+      for (var ai = 0; ai < o.addressGroups.length; ai++) {
+        var ag = o.addressGroups[ai];
+        if (!addrGroupPool[ag.name]) addrGroupPool[ag.name] = new Set();
+        ag.members.forEach(function(m){ addrGroupPool[ag.name].add(m); });
+      }
+      for (var si = 0; si < o.serviceGroups.length; si++) {
+        var sg = o.serviceGroups[si];
+        if (!svcGroupPool[sg.name]) svcGroupPool[sg.name] = new Set();
+        sg.members.forEach(function(m){ svcGroupPool[sg.name].add(m); });
+      }
+    }
+
+    /* Collect direct policy references */
+    var directAddrRefs = new Set();
+    var directSvcRefs  = new Set();
+    for (var cj = 0; cj < childDGs.length; cj++) {
+      var dgPols = policies[childDGs[cj]] || [];
+      for (var pi = 0; pi < dgPols.length; pi++) {
+        var pol = dgPols[pi];
+        if (ignoreDisabled && pol.disabled) continue;
+        if (pol.sources.indexOf('none') >= 0 || pol.destinations.indexOf('none') >= 0) continue;
+        pol.sources.forEach(function(s)        { if (!BUILTIN_NAMES.has(s)) directAddrRefs.add(s); });
+        pol.destinations.forEach(function(d)   { if (!BUILTIN_NAMES.has(d)) directAddrRefs.add(d); });
+        pol.translatedAddrs.forEach(function(a){ if (!BUILTIN_NAMES.has(a)) directAddrRefs.add(a); });
+        pol.services.forEach(function(s)       { if (!BUILTIN_NAMES.has(s)) directSvcRefs.add(s);  });
+      }
+    }
+
+    var addrInUse = expandRefs(directAddrRefs, addrGroupPool);
+    var svcInUse  = expandRefs(directSvcRefs,  svcGroupPool);
+
+    var dgo = objects[dg];
+    if (!dgo) continue;
+
+    dgo.addresses.forEach(function(x) {
+      if (!addrInUse.has(x.name))
+        results.push({ type:'address',       typeLabel:'Address',       dg:dg, name:x.name, details:x.details,
+                       deleteCommand:buildDeleteCmd(dg,'address',x.name),       selected:true });
+    });
+    dgo.addressGroups.forEach(function(x) {
+      if (!addrInUse.has(x.name))
+        results.push({ type:'address-group', typeLabel:'Address Group', dg:dg, name:x.name, details:x.details,
+                       deleteCommand:buildDeleteCmd(dg,'address-group',x.name), selected:true });
+    });
+    dgo.services.forEach(function(x) {
+      if (!svcInUse.has(x.name))
+        results.push({ type:'service',       typeLabel:'Service',       dg:dg, name:x.name, details:x.details,
+                       deleteCommand:buildDeleteCmd(dg,'service',x.name),       selected:true });
+    });
+    dgo.serviceGroups.forEach(function(x) {
+      if (!svcInUse.has(x.name))
+        results.push({ type:'service-group', typeLabel:'Service Group', dg:dg, name:x.name, details:x.details,
+                       deleteCommand:buildDeleteCmd(dg,'service-group',x.name), selected:true });
+    });
+
+    if (i % 5 === 4 || i === total - 1) {
+      var pct = Math.round(((i + 1) / total) * 100);
+      if (onProgress) onProgress(pct);
+    }
+  }
+  return results;
+}
+
+/* ---- Message handler ---- */
+
+self.onmessage = function(e) {
+  var type    = e.data.type;
+  var payload = e.data.payload;
+  var options = e.data.options;
+
+  try {
+    if (type === 'analyze-xml') {
+      /* Full pipeline: parse XML → build cache → analyze */
+      self.postMessage({ type:'progress', pct:2, label:'Parsing XML...' });
+      var doc = new DOMParser().parseFromString(payload, 'text/xml');
+      var err = doc.querySelector('parsererror');
+      if (err) throw new Error('XML parse error: ' + err.textContent.slice(0, 200));
+
+      var cache = buildXMLCache(doc);  /* posts progress 5–43% */
+
+      self.postMessage({ type:'progress', pct:45, label:'Analyzing unused objects...' });
+      var results = analyzeCache(cache, options, function(pct) {
+        self.postMessage({ type:'progress',
+          pct:   45 + Math.round(pct * 0.5),
+          label: 'Analyzing unused objects...' });
+      });
+      self.postMessage({ type:'done', results:results });
+
+    } else if (type === 'analyze-cache') {
+      /* Cache already built (set-commands path) */
+      self.postMessage({ type:'progress', pct:52, label:'Analyzing unused objects...' });
+      var cacheResults = analyzeCache(payload, options, function(pct) {
+        self.postMessage({ type:'progress',
+          pct:   52 + Math.round(pct * 0.43),
+          label: 'Analyzing unused objects...' });
+      });
+      self.postMessage({ type:'done', results:cacheResults });
+
+    } else {
+      throw new Error('Unknown worker message type: ' + type);
+    }
+  } catch(err) {
+    self.postMessage({ type:'error', message: err.message || String(err) });
+  }
+};
+`;
+
+/* ============================================================
+   WORKER LAUNCHER
+   ============================================================ */
+
+let _workerBlobUrl = null;
+
+function getWorkerBlobUrl() {
+  if (!_workerBlobUrl)
+    _workerBlobUrl = URL.createObjectURL(new Blob([WORKER_SRC], { type: 'application/javascript' }));
+  return _workerBlobUrl;
+}
+
+/**
+ * runWorker — unified launcher for both message types.
+ * onProgress(pct, label) called for each progress update.
+ */
+function runWorker(msgType, payload, options, onProgress) {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(getWorkerBlobUrl());
+    worker.onmessage = ({ data }) => {
+      if      (data.type === 'progress') onProgress(data.pct, data.label);
+      else if (data.type === 'done')     { worker.terminate(); resolve(data.results); }
+      else if (data.type === 'error')    { worker.terminate(); reject(new Error(data.message)); }
+    };
+    worker.onerror = err => { worker.terminate(); reject(err); };
+    worker.postMessage({ type: msgType, payload, options });
+  });
+}
+
+/* ============================================================
+   SET COMMANDS CACHE BUILDER  (stays on main thread for async yields)
+
+   Limitation: DG parent/child hierarchy cannot be inferred from
+   set command output; all non-shared DGs are treated as direct
+   children of shared.
+   ============================================================ */
+
+async function buildSetCommandsCache(text, onProgress) {
+  onProgress(2);
+  await yieldToUI();
+
+  const raw        = {};
+  const rawPolicies = {};
+
+  function ensureDG(dg) {
+    if (!raw[dg]) {
+      raw[dg] = { address: {}, 'address-group': {}, service: {}, 'service-group': {} };
+      rawPolicies[dg] = [];
+    }
+  }
+
+  function tokenize(line) {
+    const tokens = [], re = /\"([^\"]*)\"|'([^']*)'|(\S+)/g;
+    let m;
+    while ((m = re.exec(line)) !== null) tokens.push(m[1] ?? m[2] ?? m[3]);
+    return tokens;
+  }
+
+  function extractList(tokens, start) {
+    if (tokens[start] === '[') {
+      const out = [];
+      for (let k = start + 1; k < tokens.length; k++) {
+        if (tokens[k] === ']') break;
+        out.push(tokens[k]);
+      }
+      return out;
+    }
+    return tokens[start] ? [tokens[start]] : [];
+  }
+
+  function addUniq(arr, items) {
+    for (const it of items) if (!arr.includes(it)) arr.push(it);
+  }
+
+  const lines = text.split('\n');
+  const total = lines.length;
+
+  for (let i = 0; i < total; i++) {
+    const raw_line = lines[i].trim();
+    if (!raw_line.startsWith('set ')) continue;
+
+    const tok = tokenize(raw_line);
+    let pos = 1;
+
+    let dg = 'shared';
+    if      (tok[pos] === 'shared')       { dg = 'shared';                   pos++;     }
+    else if (tok[pos] === 'device-group') { dg = tok[pos+1] || 'unknown';    pos += 2;  }
+
+    ensureDG(dg);
+    const kw = tok[pos];
+
+    if (kw === 'address' && tok[pos+1]) {
+      const name = tok[pos+1], addrTyp = tok[pos+2], addrVal = tok[pos+3] || '?';
+      if (!raw[dg].address[name]) raw[dg].address[name] = { details: '-' };
+      if      (addrTyp === 'ip-netmask') raw[dg].address[name].details = addrVal;
+      else if (addrTyp === 'ip-range')   raw[dg].address[name].details = addrVal + ' (range)';
+      else if (addrTyp === 'fqdn')       raw[dg].address[name].details = addrVal + ' (fqdn)';
+
+    } else if (kw === 'address-group' && tok[pos+1]) {
+      const name = tok[pos+1], subKey = tok[pos+2];
+      if (!raw[dg]['address-group'][name])
+        raw[dg]['address-group'][name] = { members: [], isDynamic: false };
+      const ag = raw[dg]['address-group'][name];
+      if      (subKey === 'static')  addUniq(ag.members, extractList(tok, pos+3));
+      else if (subKey === 'dynamic') ag.isDynamic = true;
+
+    } else if (kw === 'service' && tok[pos+1]) {
+      const name = tok[pos+1];
+      if (!raw[dg].service[name]) raw[dg].service[name] = { protocols: [] };
+      if (tok[pos+2] === 'protocol') {
+        const proto   = (tok[pos+3] || '').toUpperCase();
+        const portIdx = tok.indexOf('port', pos+3);
+        const port    = portIdx >= 0 ? tok[portIdx+1] : null;
+        raw[dg].service[name].protocols.push(proto + (port ? '/' + port : ''));
+      }
+
+    } else if (kw === 'service-group' && tok[pos+1] && tok[pos+2] === 'members') {
+      const name = tok[pos+1];
+      if (!raw[dg]['service-group'][name]) raw[dg]['service-group'][name] = { members: [] };
+      addUniq(raw[dg]['service-group'][name].members, extractList(tok, pos+3));
+
+    } else if (['pre-rulebase','post-rulebase','rulebase'].includes(kw)) {
+      const ruleType = tok[pos+1], isNat = ruleType === 'nat';
+      const rulesIdx = tok.indexOf('rules', pos);
+      if (rulesIdx < 0) continue;
+      const field = tok[rulesIdx+2];
+
+      if (field === 'source' || field === 'destination') {
+        const ms = extractList(tok, rulesIdx+3).filter(m => m !== 'none' && !BUILTIN_NAMES.has(m));
+        if (ms.length) rawPolicies[dg].push({
+          isNat, disabled: false,
+          sources: field === 'source' ? ms : [], destinations: field === 'destination' ? ms : [],
+          services: [], translatedAddrs: [],
+        });
+      }
+      if (field === 'service') {
+        const ms = extractList(tok, rulesIdx+3).filter(m => !BUILTIN_NAMES.has(m));
+        if (ms.length) rawPolicies[dg].push({
+          isNat, disabled: false, sources: [], destinations: [], services: ms, translatedAddrs: [],
+        });
+      }
+      if (isNat) {
+        const taIdx = tok.indexOf('translated-address', pos);
+        if (taIdx >= 0) {
+          const ms = extractList(tok, taIdx+1).filter(m => !BUILTIN_NAMES.has(m));
+          if (ms.length) rawPolicies[dg].push({
+            isNat: true, disabled: false, sources: [], destinations: [], services: [], translatedAddrs: ms,
+          });
+        }
+      }
+    }
+
+    if (i % 3000 === 0) { onProgress(2 + Math.round((i/total)*46)); await yieldToUI(); }
+  }
+
+  onProgress(50);
+  await yieldToUI();
+
+  const deviceGroups = Object.keys(raw);
+  const hierarchy = { allDGs: deviceGroups.filter(d => d !== 'shared'), children: {}, parents: {} };
+  const nonShared = hierarchy.allDGs;
+  if (nonShared.length) {
+    hierarchy.children['shared'] = nonShared;
+    for (const d of nonShared) hierarchy.parents[d] = 'shared';
+  }
+
+  const objects = {}, policies = {};
+  for (const dg of deviceGroups) {
+    objects[dg] = {
+      addresses:     Object.entries(raw[dg].address).map(([name,d]) => ({ name, details: d.details })),
+      addressGroups: Object.entries(raw[dg]['address-group']).map(([name,d]) => ({
+        name, members: d.isDynamic ? [] : d.members, isDynamic: d.isDynamic,
+        details: d.isDynamic ? '(dynamic filter)' : truncList(d.members),
+      })),
+      services:      Object.entries(raw[dg].service).map(([name,d]) => ({ name, details: d.protocols.join(', ') || '-' })),
+      serviceGroups: Object.entries(raw[dg]['service-group']).map(([name,d]) => ({ name, members: d.members, details: truncList(d.members) })),
+    };
+    policies[dg] = rawPolicies[dg];
+  }
+
+  return { deviceGroups, hierarchy, objects, policies };
+}
+
+/* ============================================================
+   UI STATE
+   ============================================================ */
+
+const appState = {
+  fileContent:    null,
+  pasteContent:   '',
+  detectedFormat: 'empty',
+  results:        [],
+  sortCol:        'type',
+  sortAsc:        true,
+};
+
+/* ============================================================
+   UI HELPERS
+   ============================================================ */
+
+function setProgress(pct, label) {
+  document.getElementById('progress-fill').style.width = pct + '%';
+  document.getElementById('progress-pct').textContent  = pct + '%';
+  if (label) document.getElementById('progress-text').textContent = label;
+}
+
+function showProgress(visible) {
+  document.getElementById('progress-section').style.display = visible ? 'block' : 'none';
+}
+
+function showError(msg) {
+  const el = document.getElementById('error-banner');
+  if (msg) { document.getElementById('error-text').textContent = msg; el.classList.remove('hidden'); }
+  else       el.classList.add('hidden');
+}
+
+function setAnalyzeEnabled() {
+  const hasInput    = !!(appState.fileContent || appState.pasteContent.trim());
+  const validFormat = appState.detectedFormat === 'xml' || appState.detectedFormat === 'set-commands';
+  document.getElementById('analyze-btn').disabled = !(hasInput && validFormat);
+}
+
+function updateFormatBadge() {
+  const f   = appState.detectedFormat;
+  const map = {
+    xml:            ['XML Config',     'xml'],
+    'set-commands': ['Set Commands',   'set-commands'],
+    empty:          ['No input',       'unknown'],
+    unknown:        ['Unknown format', 'unknown'],
+  };
+  const [label, cls] = map[f] || ['Unknown','unknown'];
+  document.getElementById('format-indicator').textContent = label;
+  const wrap = document.getElementById('format-badge-wrap');
+  wrap.innerHTML = f !== 'empty'
+    ? '<span class="format-badge ' + cls + '">● ' + label + ' detected</span>'
+    : '';
+}
+
+function updateIgnoreDisabledVisibility() {
+  document.getElementById('ignore-disabled-wrap')
+    .classList.toggle('hidden', appState.detectedFormat !== 'xml');
+}
+
+/* ============================================================
+   RESULTS RENDERING
+   ============================================================ */
+
+function renderStats(results) {
+  const c = { address: 0, 'address-group': 0, service: 0, 'service-group': 0 };
+  for (const r of results) c[r.type]++;
+  document.getElementById('stats-grid').innerHTML =
+    '<div class="stat-card total"><div class="stat-label">Total Unused</div><div class="stat-value">' + results.length + '</div><div class="stat-sub">objects to review</div></div>' +
+    '<div class="stat-card addr" ><div class="stat-label">Addresses</div><div class="stat-value">'    + c['address']       + '</div><div class="stat-sub">unused</div></div>' +
+    '<div class="stat-card addrg"><div class="stat-label">Address Groups</div><div class="stat-value">'+ c['address-group'] + '</div><div class="stat-sub">unused</div></div>' +
+    '<div class="stat-card svc"  ><div class="stat-label">Services</div><div class="stat-value">'     + c['service']       + '</div><div class="stat-sub">unused</div></div>' +
+    '<div class="stat-card svcg" ><div class="stat-label">Service Groups</div><div class="stat-value">'+ c['service-group'] + '</div><div class="stat-sub">unused</div></div>';
+}
+
+function populateDGFilter(results) {
+  const sel = document.getElementById('dg-filter');
+  while (sel.options.length > 1) sel.remove(1);
+  for (const dg of [...new Set(results.map(r => r.dg))].sort()) {
+    const opt = document.createElement('option');
+    opt.value = dg; opt.text = dg; sel.add(opt);
+  }
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/**
+ * renderRows — rebuilds tbody HTML only.
+ * Event listeners are NOT added here; they are wired once at startup.
+ */
+function renderRows(results) {
+  document.getElementById('results-tbody').innerHTML = results.map((r, i) =>
+    '<tr data-idx="' + i + '" data-type="' + esc(r.type) + '" data-dg="' + esc(r.dg) + '" data-name="' + esc(r.name.toLowerCase()) + '">' +
+    '<td class="cb-cell"><input type="checkbox" class="row-cb" data-idx="' + i + '" ' + (r.selected ? 'checked' : '') + '></td>' +
+    '<td><span class="type-badge ' + esc(r.type) + '">' + esc(r.typeLabel) + '</span></td>' +
+    '<td><span class="dg-chip">'  + esc(r.dg)   + '</span></td>' +
+    '<td><span class="obj-name">' + esc(r.name) + '</span></td>' +
+    '<td><span class="obj-details" title="' + esc(r.details) + '">' + esc(r.details) + '</span></td>' +
+    '<td><div class="cmd-cell">' +
+      '<span class="cmd-text" title="' + esc(r.deleteCommand) + '">' + esc(r.deleteCommand) + '</span>' +
+      '<button class="copy-btn" data-cmd="' + esc(r.deleteCommand) + '" title="Copy">⧉</button>' +
+    '</div></td></tr>'
+  ).join('');
+}
+
+function applyFilters() {
+  const q   = document.getElementById('search-input').value.toLowerCase();
+  const typ = document.getElementById('type-filter').value;
+  const dg  = document.getElementById('dg-filter').value;
+  let visible = 0;
+  for (const row of document.getElementById('results-tbody').querySelectorAll('tr')) {
+    const show = (!q   || (row.dataset.name || '').includes(q)) &&
+                 (!typ || row.dataset.type === typ) &&
+                 (!dg  || row.dataset.dg   === dg);
+    row.classList.toggle('hidden', !show);
+    if (show) visible++;
+  }
+  const total = appState.results.length;
+  document.getElementById('filter-count').textContent =
+    visible === total ? total + ' objects' : visible + ' of ' + total + ' shown';
+}
+
+function sortResults(col) {
+  appState.sortAsc = appState.sortCol === col ? !appState.sortAsc : true;
+  appState.sortCol = col;
+  const asc = appState.sortAsc ? 1 : -1;
+  appState.results.sort((a, b) => {
+    const av = (a[col] || '').toString().toLowerCase();
+    const bv = (b[col] || '').toString().toLowerCase();
+    return av < bv ? -asc : av > bv ? asc : 0;
+  });
+  for (const th of document.querySelectorAll('thead th[data-col]')) {
+    th.classList.toggle('sort-asc',  th.dataset.col === col &&  appState.sortAsc);
+    th.classList.toggle('sort-desc', th.dataset.col === col && !appState.sortAsc);
+  }
+  renderRows(appState.results);
+  applyFilters();
+  updateSelectedCount();
+}
+
+function updateSelectedCount() {
+  const n = appState.results.filter(r => r.selected).length;
+  document.getElementById('selected-num').textContent = n;
+  document.getElementById('download-btn').disabled    = n === 0;
+}
+
+function showResults(results) {
+  appState.results = results;
+  document.getElementById('results-card').classList.remove('hidden');
+  document.getElementById('results-header-info').textContent = 'Analyzed ' + new Date().toLocaleTimeString();
+  renderStats(results);
+  populateDGFilter(results);
+  const empty = results.length === 0;
+  document.getElementById('empty-results').classList.toggle('hidden', !empty);
+  document.getElementById('table-section').classList.toggle('hidden',  empty);
+  if (!empty) { renderRows(results); applyFilters(); updateSelectedCount(); }
+  document.getElementById('results-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+/* ============================================================
+   DOWNLOAD
+   ============================================================ */
+
+function downloadDeleteCommands() {
+  const sel = appState.results.filter(r => r.selected);
+  if (!sel.length) return;
+  const ts  = new Date().toISOString().slice(0,19).replace('T','_').replace(/:/g,'-');
+  const hdr = [
+    '# PAN-OS Unused Object Delete Commands',
+    '# Generated:        ' + new Date().toLocaleString(),
+    '# Objects selected: ' + sel.length,
+    '#',
+    '# Paste into Panorama/NGFW CLI (configuration mode).',
+    '# Review carefully before committing. After pasting, run: commit',
+    '',
+  ].join('\n');
+  const byDG = {};
+  for (const r of sel) (byDG[r.dg] = byDG[r.dg] || []).push(r.deleteCommand);
+  const body = Object.entries(byDG).sort().flatMap(([dg, cmds]) =>
+    ['# --- ' + dg + ' ---', ...cmds.sort(), '']
+  ).join('\n');
+  const url = URL.createObjectURL(new Blob([hdr + body], { type: 'text/plain' }));
+  const a   = document.createElement('a');
+  a.href    = url;
+  a.download = 'pan_delete_unused_' + ts + '.txt';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/* ============================================================
+   MAIN ANALYZE FLOW
+   ============================================================ */
+
+async function runAnalysis() {
+  showError(null);
+  showProgress(true);
+  setProgress(2, 'Starting...');
+  document.getElementById('analyze-btn').disabled = true;
+  document.getElementById('results-card').classList.add('hidden');
+  await yieldToUI();
+
+  try {
+    const format  = appState.detectedFormat;
+    const content = appState.fileContent || appState.pasteContent;
+    const options = {
+      ignoreDisabled: format === 'xml' && document.getElementById('ignore-disabled-cb').checked,
+    };
+
+    let results;
+
+    if (format === 'xml') {
+      // XML: post raw string to worker — DOMParser runs there, no main-thread freeze
+      results = await runWorker('analyze-xml', content, options,
+        (pct, label) => setProgress(pct, label));
+
+    } else if (format === 'set-commands') {
+      // Set commands: parse on main thread (chunked async), then analyze in worker
+      const cache = await buildSetCommandsCache(content,
+        pct => setProgress(pct, pct < 48 ? 'Parsing set commands...' : 'Building cache...'));
+      results = await runWorker('analyze-cache', cache, options,
+        (pct, label) => setProgress(pct, label));
+
+    } else {
+      throw new Error('Unrecognised input. Please provide a Panorama XML export or PAN-OS set commands.');
+    }
+
+    setProgress(100, 'Done — ' + results.length + ' unused object' + (results.length !== 1 ? 's' : '') + ' found');
+    await yieldToUI();
+    setTimeout(() => showProgress(false), 900);
+    showResults(results);
+
+  } catch(err) {
+    console.error('[pan_analyzer]', err);
+    showError(err.message || 'Unexpected error — see browser console for details.');
+    showProgress(false);
+  } finally {
+    document.getElementById('analyze-btn').disabled = false;
+  }
+}
+
+/* ============================================================
+   EVENT WIRING
+   ============================================================ */
+
+const fileInput = document.getElementById('file-input');
+const dropZone  = document.getElementById('drop-zone');
+
+document.getElementById('browse-link').addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', () => { if (fileInput.files[0]) loadFile(fileInput.files[0]); });
+
+function loadFile(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    appState.fileContent  = e.target.result;
+    appState.pasteContent = '';
+    document.getElementById('paste-input').value = '';
+    const sz = file.size > 1 << 20
+      ? (file.size / 1024 / 1024).toFixed(1) + ' MB'
+      : Math.round(file.size / 1024) + ' KB';
+    document.getElementById('file-name-display').textContent = file.name;
+    document.getElementById('file-size-display').textContent = '(' + sz + ')';
+    document.getElementById('file-chosen').style.display     = 'flex';
+    document.getElementById('file-panel').classList.add('active');
+    document.getElementById('paste-panel').classList.remove('active');
+    appState.detectedFormat = detectFormat(appState.fileContent);
+    updateFormatBadge(); updateIgnoreDisabledVisibility();
+    setAnalyzeEnabled(); showError(null);
+  };
+  reader.readAsText(file);
+}
+
+dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('dragging'); });
+dropZone.addEventListener('dragleave', ()  => dropZone.classList.remove('dragging'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.classList.remove('dragging');
+  if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
+});
+
+document.getElementById('clear-file-btn').addEventListener('click', () => {
+  appState.fileContent = null; fileInput.value = '';
+  document.getElementById('file-chosen').style.display = 'none';
+  document.getElementById('file-panel').classList.remove('active');
+  appState.detectedFormat = detectFormat(appState.pasteContent || '');
+  updateFormatBadge(); updateIgnoreDisabledVisibility();
+  setAnalyzeEnabled();
+});
+
+document.getElementById('paste-input').addEventListener('input', e => {
+  appState.pasteContent = e.target.value;
+  if (appState.pasteContent.trim()) {
+    appState.fileContent = null; fileInput.value = '';
+    document.getElementById('file-chosen').style.display = 'none';
+    document.getElementById('file-panel').classList.remove('active');
+    document.getElementById('paste-panel').classList.add('active');
+  } else {
+    document.getElementById('paste-panel').classList.remove('active');
+  }
+  appState.detectedFormat = detectFormat(appState.pasteContent || appState.fileContent || '');
+  updateFormatBadge(); updateIgnoreDisabledVisibility();
+  setAnalyzeEnabled(); showError(null);
+});
+
+document.getElementById('analyze-btn').addEventListener('click', runAnalysis);
+
+document.querySelectorAll('thead th[data-col]').forEach(th =>
+  th.addEventListener('click', () => sortResults(th.dataset.col))
+);
+
+document.getElementById('search-input').addEventListener('input',  applyFilters);
+document.getElementById('type-filter').addEventListener('change',  applyFilters);
+document.getElementById('dg-filter').addEventListener('change',    applyFilters);
+
+/* Table row delegation — wired ONCE here, not inside renderRows */
+document.getElementById('results-tbody').addEventListener('change', e => {
+  if (e.target.classList.contains('row-cb')) {
+    appState.results[+e.target.dataset.idx].selected = e.target.checked;
+    updateSelectedCount();
+  }
+});
+
+document.getElementById('results-tbody').addEventListener('click', e => {
+  const btn = e.target.closest('.copy-btn');
+  if (!btn) return;
+  navigator.clipboard.writeText(btn.dataset.cmd).then(() => {
+    const orig = btn.textContent;
+    btn.textContent = '✓'; btn.style.color = 'var(--success)';
+    setTimeout(() => { btn.textContent = orig; btn.style.color = ''; }, 1500);
+  }).catch(() => {
+    const range = document.createRange();
+    range.selectNodeContents(btn.previousElementSibling);
+    const sel = window.getSelection();
+    sel.removeAllRanges(); sel.addRange(range);
+  });
+});
+
+document.getElementById('select-all-cb').addEventListener('change', e => {
+  const checked = e.target.checked;
+  for (const row of document.getElementById('results-tbody').querySelectorAll('tr:not(.hidden)')) {
+    const idx = +row.dataset.idx;
+    appState.results[idx].selected = checked;
+    row.querySelector('.row-cb').checked = checked;
+  }
+  updateSelectedCount();
+});
+
+document.getElementById('select-all-btn').addEventListener('click', () => {
+  for (const r  of appState.results) r.selected = true;
+  for (const cb of document.querySelectorAll('.row-cb')) cb.checked = true;
+  document.getElementById('select-all-cb').checked = true;
+  updateSelectedCount();
+});
+
+document.getElementById('deselect-all-btn').addEventListener('click', () => {
+  for (const r  of appState.results) r.selected = false;
+  for (const cb of document.querySelectorAll('.row-cb')) cb.checked = false;
+  document.getElementById('select-all-cb').checked = false;
+  updateSelectedCount();
+});
+
+document.getElementById('download-btn').addEventListener('click', downloadDeleteCommands);
+
+</script>
+</body>
+</html>
